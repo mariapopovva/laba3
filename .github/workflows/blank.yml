@@ -1,0 +1,66 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install flake8
+      - name: Run flake8
+        run: flake8 .
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+      - name: Run tests
+        run: pytest -v
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to server
+        env:
+          HOST: ${{ secrets.PROD_HOST }}
+          USER: ${{ secrets.PROD_USER }}
+          KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          DIR: ${{ secrets.PROD_DIR }}
+        run: |
+          echo "$KEY" > private_key.pem
+          chmod 600 private_key.pem
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST "
+            set -e
+            if [ ! -d \"$DIR\" ]; then
+              mkdir -p \"$DIR\"
+              cd \"$DIR\"
+              git clone $(git config --get remote.origin.url) .
+            else
+              cd \"$DIR\"
+              git pull origin main
+            fi
+            python3 -m venv .venv
+            source .venv/bin/activate
+            pip install -r requirements.txt
+            pkill -f gunicorn || true
+            nohup .venv/bin/gunicorn -w 2 -b 0.0.0.0:8000 app:app &
+          "
