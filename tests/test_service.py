@@ -1,4 +1,3 @@
-import pytest
 from service import add_income, add_expense
 
 
