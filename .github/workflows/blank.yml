@@ -18,7 +18,7 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
       - name: Run tests
-        run: pytest -v
+        run: pytest -v tests/
 
   deploy:
     runs-on: ubuntu-latest
@@ -50,3 +50,4 @@ jobs:
             pkill -f gunicorn || true
             nohup .venv/bin/gunicorn -w 2 -b 0.0.0.0:8000 app:app &
           "
+          
